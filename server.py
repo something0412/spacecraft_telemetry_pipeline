@@ -3,15 +3,24 @@ from pydantic import  BaseModel
 from datetime import datetime
 import sqlite3
 from contextlib import asynccontextmanager
+from fastapi.middleware.cors import CORSMiddleware
 
 # Run: uvicorn server:app --reload
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
+@asynccontextmanager    # This tells FastAPI to run everything standing before "yeild" before start serving. Everthing standing after yield should be run when the server is called to shut down (mostly use for closing files/db)
+async def lifespan(app: FastAPI):   # Purpose of this is to check if the ground system is ready to start serving
     init_db()
     yield
 
 app = FastAPI(lifespan=lifespan)
+
+# Allowed origins
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=['http://localhost:5173'],
+    allow_methods=['*'],
+    allow_headers=['*'],
+)
 
 #todo -- Pydantic model goes here - This class is for auto-checking (ability from FastAPI) the incoming data packet
 class TelemetryPacket(BaseModel):
@@ -75,7 +84,8 @@ def get_request(
     spacecraft_id: str | None = None, 
     start: datetime | None = None, 
     end: datetime | None = None,
-    limit: int = 20,
+    order: str = 'DESC',
+    limit: int = 15,
 ):
     conditions = []
     params = []
@@ -94,6 +104,10 @@ def get_request(
     if conditions:
         query += " WHERE " + " AND ".join(conditions)
     
+    if order:
+        allowed_orders = ['ASC','DESC']
+        if order.upper() in allowed_orders:
+            query += f" ORDER BY timestamp {order.upper()}"
     if limit:
         query += " LIMIT ?"
         params.append(limit)

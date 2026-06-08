@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Spacecraft Telemetry Dashboard</title>
+        <link rel="stylesheet" href="/src/style.css" />
+    </head>
+    <body>
+        <h1>Spacecraft Telemetry Dashboard</h1>
+
+        <div id="latest"></div>
+
+        <div class="charts">
+            <canvas id="temp-chart"></canvas>
+            <canvas id="voltage-chart"></canvas>
+            <canvas id="altitude-chart"></canvas>
+            <canvas id="attitude-chart"></canvas>
+        </div>
+
+        <script type="module" src="/src/main.ts"></script>
+    </body>
+</html>
