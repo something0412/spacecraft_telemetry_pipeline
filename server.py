@@ -51,8 +51,33 @@ def init_db():
     )
     conn.commit()
 
+    try:
+        cursor.execute("PRAGMA table_info(telemetry)")
+        columns = [col[1] for col in cursor.fetchall()]
+        if 'is_anomaly' not in columns:
+            cursor.execute("ALTER TABLE telemetry ADD COLUMN is_anomaly INTEGER DEFAULT 0")
+            conn.commit()
+    except sqlite3.OperationalError as err:
+        print(f"Error at init_db(): {err}")
+
     # Close connection
     conn.close()
+
+#todo -- Check anomaly (if the values are in bounds ~ safe)
+def check_anomaly(packet: TelemetryPacket) -> bool:
+    bounds = {
+        'temperature': (-40.0,  85.0),
+        'battery_voltage': (22.0,  29.5),
+        'altitude': (400.0, 420.0),
+        'attitude': (-180.0, 180.0),
+    }
+
+    for key, value in packet:
+        if key not in bounds:
+            continue
+        if value < bounds[key][0] or value > bounds[key][1]:
+            return True
+    return False
 
 #todo -- Endpoints go here
 '''
@@ -66,16 +91,17 @@ def init_db():
 #? receiving packet from sc_simulator
 @app.post('/telemetry', status_code=201)
 def post_request(packet: TelemetryPacket):
-    packet_data = (packet.spacecraft_id, packet.timestamp.isoformat(), packet.temperature, packet.battery_voltage, packet.altitude, packet.attitude)
+    anomaly = check_anomaly(packet)
+    packet_data = (packet.spacecraft_id, packet.timestamp.isoformat(), packet.temperature, packet.battery_voltage, packet.altitude, packet.attitude, anomaly)
     conn = sqlite3.connect("telemetry.db")
     # cursor = conn.cursor()
     conn.execute("""
-        INSERT INTO telemetry(spacecraft_id, timestamp, temperature, battery_voltage, altitude, attitude) 
-            VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO telemetry(spacecraft_id, timestamp, temperature, battery_voltage, altitude, attitude, is_anomaly) 
+            VALUES (?, ?, ?, ?, ?, ?, ?)
     """, packet_data)
     conn.commit()
     conn.close()
-    return {"status": "ok"}
+    return {"status": "ok", "is_anomaly": anomaly}
 
 #? receiving get request and return the response obj
 # FastAPI automatically maps everthing after ? into the function arguments
@@ -107,12 +133,13 @@ def get_request(
     if order:
         allowed_orders = ['ASC','DESC']
         if order.upper() in allowed_orders:
-            query += f" ORDER BY timestamp {order.upper()}"
+            query += f" ORDER BY timestamp {order.upper()}, id {order.upper()}"
     if limit:
         query += " LIMIT ?"
         params.append(limit)
 
     conn = sqlite3.connect("telemetry.db")
+    # Allow return dict-like object instead of tuples (one tuple for each row)
     conn.row_factory = sqlite3.Row
     cursor = conn.execute(query, params)
     response = cursor.fetchall()

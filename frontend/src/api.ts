@@ -8,6 +8,7 @@ export interface TelemetryPacket {
   battery_voltage: number;
   altitude: number;
   attitude: number;
+  is_anomaly: number;
 }
 
 export async function fetchTelemetry(): Promise<TelemetryPacket[]> {
